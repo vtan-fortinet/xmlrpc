@@ -1,9 +1,8 @@
 package xmlrpc
 
 import (
-    "testing"
+	"testing"
 )
-
 
 func TestT(tst *testing.T) {
 

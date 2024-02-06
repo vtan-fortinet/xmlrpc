@@ -2,21 +2,21 @@ package xmlrpc
 
 import (
 	"testing"
-//	"testing/iotest"
+	//	"testing/iotest"
 
-//    "io"
-	"fmt"
-	"time"
+	//    "io"
 	"bytes"
+	"encoding/xml"
+	"fmt"
 	"reflect"
 	"strings"
-	"encoding/xml"
+	"time"
 )
 
 func xmlEscapeString(src string) string {
 	buf := bytes.NewBufferString("")
-    xml.EscapeText(buf, []byte(src))
-    return buf.String()
+	xml.EscapeText(buf, []byte(src))
+	return buf.String()
 }
 
 func getTypeString(val interface{}, noSpaces bool) string {
@@ -57,8 +57,8 @@ func getTypeString(val interface{}, noSpaces bool) string {
 		return fmt.Sprintf("%s<double>%s</double>%s", pre, fStr, post)
 	case int:
 		return fmt.Sprintf("%s<int>%d</int>%s", pre, v, post)
-    case []byte:
-        return string(v)
+	case []byte:
+		return string(v)
 	case string:
 		//return v
 		return fmt.Sprintf("%s<string>%s</string>%s", pre, xmlEscapeString(val.(string)), post)
@@ -110,9 +110,9 @@ func marshalString(methodName string, args ...interface{}) (string, error) {
 func parseAndCheck(t *testing.T, methodName string, expVal interface{},
 	xmlStr string) {
 	name, val, err, fault := UnmarshalString(xmlStr)
-    if val != nil {
-        val = extractParams(val.([]interface{}))
-    }
+	if val != nil {
+		val = extractParams(val.([]interface{}))
+	}
 	if err != nil {
 		t.Fatalf("Returned error %s", err)
 	} else if fault != nil {
@@ -145,9 +145,9 @@ func parseAndCheck(t *testing.T, methodName string, expVal interface{},
 func parseUnimplemented(t *testing.T, methodName string, expVal interface{}) {
 	xmlStr := wrapMethod(methodName, expVal)
 	name, val, err, fault := UnmarshalString(xmlStr)
-    if val != nil {
-        val = extractParams(val.([]interface{}))
-    }
+	if val != nil {
+		val = extractParams(val.([]interface{}))
+	}
 	if err == nil {
 		t.Fatalf("Unimplemented type didn't return an error")
 	} else if !strings.Contains(err.Error(), "nimplemented") {
@@ -473,26 +473,23 @@ func TestParseResponseStruct(t *testing.T) {
 	wrapAndParse(t, "", structMap)
 }
 
-
 func TestNewFault(tst *testing.T) {
-    f := NewFault(123, "fault 123")
-    tst.Logf("fault = %v", f.String())
-    f = nil
-    if f.String() != "NilFault" {
-        tst.Errorf("miss NilFault")
-    }
+	f := NewFault(123, "fault 123")
+	tst.Logf("fault = %v", f.String())
+	f = nil
+	if f.String() != "NilFault" {
+		tst.Errorf("miss NilFault")
+	}
 }
-
 
 func TestUnmarshal(tst *testing.T) {
-    r := bytes.NewBufferString("abc</methodName>")
-    //R := iotest.DataErrReader(r)
-    s, i, e, f := Unmarshal(r)
-    tst.Logf("%v %v %v %v", s, i, e, f)
-    //r = nil
-    Unmarshal(nil)
+	r := bytes.NewBufferString("abc</methodName>")
+	//R := iotest.DataErrReader(r)
+	s, i, e, f := Unmarshal(r)
+	tst.Logf("%v %v %v %v", s, i, e, f)
+	//r = nil
+	Unmarshal(nil)
 }
-
 
 //func TestGetArray(tst *testing.T) {
 //    r := bytes.NewBufferString("abc</methodName>")
@@ -500,44 +497,40 @@ func TestUnmarshal(tst *testing.T) {
 //    getArray(d)
 //}
 
-
 func TestMarshal1(tst *testing.T) {
-    w := bytes.NewBuffer([]byte(""))
-    e := Marshal(w, "fname", 1, "str", make(map[string]string))
-    tst.Logf("%v", e)
-    //r = nil
-    //Unmarshal(nil)
+	w := bytes.NewBuffer([]byte(""))
+	e := Marshal(w, "fname", 1, "str", make(map[string]string))
+	tst.Logf("%v", e)
+	//r = nil
+	//Unmarshal(nil)
 }
 
-
 type S struct {
-    u uint
-    s string
+	u uint
+	s string
 }
 
 func TestMarshal2(tst *testing.T) {
-    w := bytes.NewBuffer([]byte(""))
-    m := make(map[string]string)
-    m["k"] = "v"
-    s := S{0, "1"}
-    var a [2]int
-    a[0] = 1
-    a[1] = 2
-    e := Marshal(w, "fname", 1, "str", 1.1, m, s, []string{"a", "b"}, a)
-    tst.Logf("%v", e)
-    m2 := make(map[int]string)
-    m2[1] = "2"
-    e = Marshal(w, "fname2", m2)
-    //r = nil
-    Unmarshal(w)
+	w := bytes.NewBuffer([]byte(""))
+	m := make(map[string]string)
+	m["k"] = "v"
+	s := S{0, "1"}
+	var a [2]int
+	a[0] = 1
+	a[1] = 2
+	e := Marshal(w, "fname", 1, "str", 1.1, m, s, []string{"a", "b"}, a)
+	tst.Logf("%v", e)
+	m2 := make(map[int]string)
+	m2[1] = "2"
+	e = Marshal(w, "fname2", m2)
+	//r = nil
+	Unmarshal(w)
 }
-
 
 func TestNewClient(tst *testing.T) {
-    c, e := NewClient("http://127.0.0.1:1234/RPC2")
-    tst.Logf("c = %v, e = %v", c, e)
+	c, e := NewClient("http://127.0.0.1:1234/RPC2")
+	tst.Logf("c = %v, e = %v", c, e)
 }
-
 
 func TestParseCall(t *testing.T) {
 	xmlStr := `<?xml version="1.0"?>
@@ -573,7 +566,6 @@ func TestParseCall(t *testing.T) {
 	parseAndCheck(t, "submit_url", false, xmlStr)
 }
 
-
 func TestParseCallNewLine(t *testing.T) {
 	xmlStr := `<?xml version="1.0"?><methodCall><methodName>submit_url</methodName><params><param><value><boolean>0</boolean></value></param></params></methodCall>`
 	parseAndCheck(t, "submit_url", false, xmlStr)
@@ -582,5 +574,3 @@ func TestParseCallNewLine(t *testing.T) {
 	parseAndCheck(t, "submit_url", false, xmlStr)
 
 }
-
-

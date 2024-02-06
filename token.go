@@ -70,11 +70,9 @@ func initTokenMap() {
 	tokenMap["value"] = tokenValue
 }
 
-
 func init() {
-    initTokenMap()
+	initTokenMap()
 }
-
 
 type xmlToken struct {
 	token   int
@@ -159,9 +157,9 @@ func getNextToken(p *xml.Decoder) (*xmlToken, error) {
 		return nil, err
 	}
 
-    // cano not do this, in multiple thread, this may cause
-    // fatal error: concurrent map read and map write
-    // move this to package init
+	// cano not do this, in multiple thread, this may cause
+	// fatal error: concurrent map read and map write
+	// move this to package init
 	//if tokenMap == nil {
 	//	initTokenMap()
 	//}

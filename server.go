@@ -1,35 +1,33 @@
 package xmlrpc
 
 import (
-	"os"
-	"io"
-	"fmt"
 	"bytes"
-	"io/ioutil"
-    "runtime"
-	"reflect"
-	"strings"
-	"net/http"
 	"encoding/xml"
+	"fmt"
+	"io"
+	"io/ioutil"
+	"net/http"
+	"os"
+	"reflect"
+	"runtime"
+	"strings"
 )
-
 
 type DFT []interface{}
 
-
 type methodData struct {
-	obj       interface{}
+	obj interface{}
 	//method    reflect.Method
-    ftype       reflect.Type    // function/method type
-    fvalue      reflect.Value   // function/method value
-	padParams   bool
-    dft         DFT
+	ftype     reflect.Type  // function/method type
+	fvalue    reflect.Value // function/method value
+	padParams bool
+	dft       DFT
 }
 
 // Map from XML-RPC procedure names to Go methods
 type Handler struct {
 	methods map[string]*methodData
-    logf    func(req *http.Request, code int, msg string)
+	logf    func(req *http.Request, code int, msg string)
 }
 
 // create a new handler mapping XML-RPC procedure names to Go methods
@@ -39,20 +37,18 @@ func NewHandler() *Handler {
 	return h
 }
 
-
 // help for debug
-func (h *Handler)GetMethodList() (ks []string) {
-    ks = make([]string, 0, 10)
-    for k, _ := range h.methods {
-        ks = append(ks, k)
-    }
-    return
+func (h *Handler) GetMethodList() (ks []string) {
+	ks = make([]string, 0, 10)
+	for k, _ := range h.methods {
+		ks = append(ks, k)
+	}
+	return
 }
 
-func (h *Handler)SetLogf(logf func(*http.Request, int, string)) {
-    h.logf = logf
+func (h *Handler) SetLogf(logf func(*http.Request, int, string)) {
+	h.logf = logf
 }
-
 
 // register all methods associated with the Go object, passing them
 // through the name mapper if one is supplied
@@ -87,33 +83,30 @@ func (h *Handler) Register(obj interface{}, mapper func(string) string,
 	return nil
 }
 
-
 // register a func, if name is "", then use func name
 func (h *Handler) RegFunc(f interface{}, name string, dft DFT) error {
 	vo := reflect.ValueOf(f)
-    if vo.Kind() != reflect.Func {
-        panic("RegFunc only register function")
-    }
-    md := &methodData{obj: nil, ftype: vo.Type(), fvalue: vo, dft: dft}
-    if name == "" {
-        // runtime.FuncForPC always return pkg.func_name, so we cut prefix "main."
-        //name = runtime.FuncForPC(vo.Pointer()).Name()[5:]
-        // But when go test, this prefix will be different, so we need LastIndex
-        s := runtime.FuncForPC(vo.Pointer()).Name()
-        i := strings.LastIndexByte(s, '.')
-        if i < 0 {
-            name = s
-        } else {
-            name = s[i + 1:]
-        }
-    }
-    h.methods[name] = md
-    return nil
+	if vo.Kind() != reflect.Func {
+		panic("RegFunc only register function")
+	}
+	md := &methodData{obj: nil, ftype: vo.Type(), fvalue: vo, dft: dft}
+	if name == "" {
+		// runtime.FuncForPC always return pkg.func_name, so we cut prefix "main."
+		//name = runtime.FuncForPC(vo.Pointer()).Name()[5:]
+		// But when go test, this prefix will be different, so we need LastIndex
+		s := runtime.FuncForPC(vo.Pointer()).Name()
+		i := strings.LastIndexByte(s, '.')
+		if i < 0 {
+			name = s
+		} else {
+			name = s[i+1:]
+		}
+	}
+	h.methods[name] = md
+	return nil
 }
 
-
 var faultType = reflect.TypeOf((*Fault)(nil))
-
 
 // Return an XML-RPC fault
 func writeFault(out io.Writer, code int, msg string) {
@@ -138,12 +131,11 @@ func writeFault(out io.Writer, code int, msg string) {
 </methodResponse>`)
 
 	// XXX dump the error to Stderr for now
-    if err != nil {
-        fmt.Fprintf(os.Stderr, "Cannot write fault#%d(%s): %v\n",
-                    code, msg, err)
-    }
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Cannot write fault#%d(%s): %v\n",
+			code, msg, err)
+	}
 }
-
 
 // semi-standard XML-RPC response codes
 const (
@@ -153,145 +145,159 @@ const (
 	errInternal      = -32603
 )
 
+func (mData *methodData) getVals(methodName string, args []interface{}, req *http.Request) (vals []reflect.Value, f *Fault) {
 
-func (mData *methodData)getVals(methodName string, args []interface{}, req *http.Request) (vals []reflect.Value, f *Fault) {
+	// expecting arg number
+	expArgs := mData.ftype.NumIn()
+	// valus will be used to call function, +1 is for potential req
+	vals = make([]reflect.Value, 0, expArgs+1)
+	x := 0
 
-    // expecting arg number
-    expArgs := mData.ftype.NumIn()
-    // valus will be used to call function, +1 is for potential req
-	vals = make([]reflect.Value, 0, expArgs + 1)
-    x := 0
+	if mData.obj != nil {
+		// this function is a object's method, fill first val with obj
+		vals = append(vals, reflect.ValueOf(mData.obj))
+		x = x + 1
+	}
 
-    if mData.obj != nil {
-        // this function is a object's method, fill first val with obj
-        vals = append(vals, reflect.ValueOf(mData.obj))
-        x = x + 1
-    }
+	if expArgs > x && reflect.TypeOf(req) == mData.ftype.In(x) {
+		// first request is *http.Request, we fill it
+		vals = append(vals, reflect.ValueOf(req))
+		x = x + 1
+	}
 
-    if expArgs > x && reflect.TypeOf(req) == mData.ftype.In(x) {
-        // first request is *http.Request, we fill it
-        vals = append(vals, reflect.ValueOf(req))
-        x = x + 1
-    }
+	for _, arg := range args {
+		vals = append(vals, reflect.ValueOf(arg))
+	}
 
-    for _, arg := range args {
-        vals = append(vals, reflect.ValueOf(arg))
-    }
+	ff := func() *Fault {
+		f := Fault{errInvalidParams,
+			fmt.Sprintf("Bad number of parameters for method \"%s\","+
+				" (input %d != expect %d)",
+				methodName, len(args), expArgs-x)}
+		return &f
+	}
 
+	// input and request match
+	if len(vals) == expArgs {
+		return
+	}
 
-    ff := func() *Fault {
-        f := Fault{errInvalidParams,
-                   fmt.Sprintf("Bad number of parameters for method \"%s\","+
-                               " (input %d != expect %d)",
-                               methodName, len(args), expArgs - x)}
-        return &f
-    }
+	// can miss one or give more because IsVariadic is true
+	if mData.ftype.IsVariadic() && len(vals) >= expArgs-1 {
+		return
+	}
 
-    // input and request match
-    if len(vals) == expArgs { return }
+	// input more
+	if len(vals) > expArgs {
+		f = ff()
+		return
+	}
 
-    // can miss one or give more because IsVariadic is true
-    if mData.ftype.IsVariadic() && len(vals) >= expArgs -1 { return }
+	dl := len(mData.dft)
 
-    // input more
-    if len(vals) > expArgs {
-        f = ff()
-        return
-    }
-
-    dl := len(mData.dft)
-
-    for i := len(vals); i < expArgs; i++ {
-        if dl > 0 && dl + i >= expArgs {
-            vals = append(vals, reflect.ValueOf(mData.dft[dl - expArgs + i]))
-        } else if mData.padParams {
-            vals = append(vals, reflect.Zero(mData.ftype.In(i)))
-        } else {
-            f = ff()
-            return
-        }
-    }
-    return
+	for i := len(vals); i < expArgs; i++ {
+		if dl > 0 && dl+i >= expArgs {
+			vals = append(vals, reflect.ValueOf(mData.dft[dl-expArgs+i]))
+		} else if mData.padParams {
+			vals = append(vals, reflect.Zero(mData.ftype.In(i)))
+		} else {
+			f = ff()
+			return
+		}
+	}
+	return
 }
-
 
 // handle an XML-RPC request
 func (h *Handler) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
-    b, _ := ioutil.ReadAll(req.Body)
-    body := string(b)
-    if h.logf != nil { h.logf(req, 0, body) }
-    methodName, params, err, fault := UnmarshalString(body)
-    //methodName, params, err, fault := Unmarshal(req.Body)
+	b, _ := ioutil.ReadAll(req.Body)
+	body := string(b)
+	if h.logf != nil {
+		h.logf(req, 0, body)
+	}
+	methodName, params, err, fault := UnmarshalString(body)
+	//methodName, params, err, fault := Unmarshal(req.Body)
 
-    if err != nil {
-        msg := fmt.Sprintf("Unmarshal error: %v", err)
-        writeFault(resp, errNotWellFormed, msg)
-        if h.logf != nil { h.logf(req, errNotWellFormed, msg) }
-        return
-    } else if fault != nil {
-        writeFault(resp, fault.Code, fault.Msg)
-        if h.logf != nil { h.logf(req, fault.Code, fault.Msg) }
-        return
+	if err != nil {
+		msg := fmt.Sprintf("Unmarshal error: %v", err)
+		writeFault(resp, errNotWellFormed, msg)
+		if h.logf != nil {
+			h.logf(req, errNotWellFormed, msg)
+		}
+		return
+	} else if fault != nil {
+		writeFault(resp, fault.Code, fault.Msg)
+		if h.logf != nil {
+			h.logf(req, fault.Code, fault.Msg)
+		}
+		return
 	}
 
-    // try to get input arguments
-    var args []interface{}
-    var ok bool
+	// try to get input arguments
+	var args []interface{}
+	var ok bool
 
-    if args, ok = params.([]interface{}); !ok {
-        args = make([]interface{}, 1, 1)
-        args[0] = params
-    }
+	if args, ok = params.([]interface{}); !ok {
+		args = make([]interface{}, 1, 1)
+		args[0] = params
+	}
 
-    // try to find registered function by name
-    var mData *methodData
+	// try to find registered function by name
+	var mData *methodData
 
-    if mData, ok = h.methods[methodName]; !ok {
-        msg := fmt.Sprintf("Unknown method \"%s\"", methodName)
-        writeFault(resp, errUnknownMethod, msg)
-        if h.logf != nil { h.logf(req, errUnknownMethod, msg) }
-        return
-    }
+	if mData, ok = h.methods[methodName]; !ok {
+		msg := fmt.Sprintf("Unknown method \"%s\"", methodName)
+		writeFault(resp, errUnknownMethod, msg)
+		if h.logf != nil {
+			h.logf(req, errUnknownMethod, msg)
+		}
+		return
+	}
 
-    // get values
-    vals, f := mData.getVals(methodName, args, req)
-    if f != nil {
-        writeFault(resp, f.Code, f.Msg)
-        if h.logf != nil { h.logf(req, f.Code, f.Msg) }
-        return
-    }
+	// get values
+	vals, f := mData.getVals(methodName, args, req)
+	if f != nil {
+		writeFault(resp, f.Code, f.Msg)
+		if h.logf != nil {
+			h.logf(req, f.Code, f.Msg)
+		}
+		return
+	}
 
-    if h.logf != nil {
-        h.logf(req, 0, fmt.Sprintf("call method %v, input %v", methodName, vals))
-    }
-    // exec function
-    rtnVals := mData.fvalue.Call(vals)
+	if h.logf != nil {
+		h.logf(req, 0, fmt.Sprintf("call method %v, input %v", methodName, vals))
+	}
+	// exec function
+	rtnVals := mData.fvalue.Call(vals)
 
-    if len(rtnVals) == 1 && reflect.TypeOf(rtnVals[0].Interface()) == faultType {
-        if fault, ok := rtnVals[0].Interface().(*Fault); ok {
-            writeFault(resp, fault.Code, fault.Msg)
-            if h.logf != nil { h.logf(req, fault.Code, fault.Msg) }
-            return
-        }
-    }
+	if len(rtnVals) == 1 && reflect.TypeOf(rtnVals[0].Interface()) == faultType {
+		if fault, ok := rtnVals[0].Interface().(*Fault); ok {
+			writeFault(resp, fault.Code, fault.Msg)
+			if h.logf != nil {
+				h.logf(req, fault.Code, fault.Msg)
+			}
+			return
+		}
+	}
 
-    mArray := make([]interface{}, len(rtnVals), len(rtnVals))
-    for i := 0; i < len(rtnVals); i++ {
-        mArray[i] = rtnVals[i].Interface()
-    }
+	mArray := make([]interface{}, len(rtnVals), len(rtnVals))
+	for i := 0; i < len(rtnVals); i++ {
+		mArray[i] = rtnVals[i].Interface()
+	}
 
-    buf := bytes.NewBufferString("")
-    err = marshalArray(buf, "", mArray)
-    if err != nil {
-        msg := fmt.Sprintf("Failed to marshal %s: %v", methodName, err)
-        writeFault(resp, errInternal, msg)
-        if h.logf != nil { h.logf(req, errInternal, "ouput: " + msg) }
-        return
-    }
-    //fmt.Fprintf(os.Stderr, buf.String())
-    buf.WriteTo(resp)
+	buf := bytes.NewBufferString("")
+	err = marshalArray(buf, "", mArray)
+	if err != nil {
+		msg := fmt.Sprintf("Failed to marshal %s: %v", methodName, err)
+		writeFault(resp, errInternal, msg)
+		if h.logf != nil {
+			h.logf(req, errInternal, "ouput: "+msg)
+		}
+		return
+	}
+	//fmt.Fprintf(os.Stderr, buf.String())
+	buf.WriteTo(resp)
 }
-
 
 /*
 // handle an XML-RPC request

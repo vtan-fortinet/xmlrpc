@@ -1,27 +1,25 @@
 package xmlrpc
 
 import (
-    "io"
-//    "os"  
-    "fmt"
-    "time"
-    "bytes"
-    "errors"
-    "reflect"
-    "strconv"
-    "strings"
-    "net/url"
-    "net/http"
-    "encoding/xml"
+	"io"
+	//    "os"
+	"bytes"
+	"encoding/xml"
+	"errors"
+	"fmt"
+	"net/http"
+	"net/url"
+	"reflect"
+	"strconv"
+	"strings"
+	"time"
 )
-
 
 // python list, a list can have different type item
 type LIST []interface{}
 
 // python dict, a map can have different type value
 type DICT map[string]interface{}
-
 
 // A Fault represents an error or exception in the procedure call
 // being run on the remote machine
@@ -45,7 +43,7 @@ func (f *Fault) String() string {
 func extractParams(v []interface{}) interface{} {
 	if len(v) == 0 {
 		return nil
-    }
+	}
 	if len(v) == 1 {
 		return v[0]
 	}
@@ -131,9 +129,11 @@ func getMethodData(p *xml.Decoder) ([]interface{}, *Fault, error) {
 		} else if inParams {
 			if tok.Is(tokenParam) {
 				inParam = tok.IsStart()
-			//	continue
-			//} else if inParam {
-                if ! inParam { continue }
+				//	continue
+				//} else if inParam {
+				if !inParam {
+					continue
+				}
 				p, perr := getValue(p)
 				if perr != nil {
 					return nil, nil, perr
@@ -141,7 +141,7 @@ func getMethodData(p *xml.Decoder) ([]interface{}, *Fault, error) {
 
 				params = append(params, p)
 				inParam = false
-                continue
+				continue
 			}
 		}
 
@@ -396,22 +396,22 @@ func getArray(p *xml.Decoder) (interface{}, error) {
 		}
 	}
 
-/*
-	if data == nil {
-		return nil, nil
-	}
+	/*
+	   	if data == nil {
+	   		return nil, nil
+	   	}
 
-	var array = reflect.MakeSlice(reflect.SliceOf(reflect.TypeOf(data[0])),
-		len(data), len(data))
-	for i := 0; i < len(data); i++ {
-		v := reflect.ValueOf(data[i])
-fmt.Printf("#%d append %v<%T> to %v<%T>\n", i, v, v, array, array)
-		//array = appendValue(array, data[i])
-		array = reflect.Append(array, v)
-	}
+	   	var array = reflect.MakeSlice(reflect.SliceOf(reflect.TypeOf(data[0])),
+	   		len(data), len(data))
+	   	for i := 0; i < len(data); i++ {
+	   		v := reflect.ValueOf(data[i])
+	   fmt.Printf("#%d append %v<%T> to %v<%T>\n", i, v, v, array, array)
+	   		//array = appendValue(array, data[i])
+	   		array = reflect.Append(array, v)
+	   	}
 
-	return array.Slice(0, array.Len()), nil
-*/
+	   	return array.Slice(0, array.Len()), nil
+	*/
 
 	return data, nil
 }
@@ -499,7 +499,7 @@ func getData(p *xml.Decoder, tok *xmlToken) (interface{}, error) {
 		return nil, nil
 	case tokenString:
 		valStr, err = getText(p)
-        //fmt.Fprintf(os.Stderr, "valStr = [%v]", valStr)
+		//fmt.Fprintf(os.Stderr, "valStr = [%v]", valStr)
 		if err != nil {
 			return nil, err
 		}
@@ -516,9 +516,9 @@ func getData(p *xml.Decoder, tok *xmlToken) (interface{}, error) {
 
 // Translate an XML stream into a local data object
 func Unmarshal(r io.Reader) (string, interface{}, error, *Fault) {
-    if r == nil {
-        return "", nil, fmt.Errorf("reader is nil"), nil
-    }
+	if r == nil {
+		return "", nil, fmt.Errorf("reader is nil"), nil
+	}
 	p := xml.NewDecoder(r)
 
 	var methodName string
@@ -567,7 +567,7 @@ func Unmarshal(r io.Reader) (string, interface{}, error, *Fault) {
 			return "", nil, perr, nil
 		}
 	}
-  //fmt.Fprintf(os.Stderr, "params = %v\n", params)
+	//fmt.Fprintf(os.Stderr, "params = %v\n", params)
 	//return methodName, extractParams(params), nil, fault
 	return methodName, params, nil, fault
 }
@@ -596,46 +596,48 @@ func wrapArray(w io.Writer, val reflect.Value) error {
 
 // translate an map[string]interface{} into XML
 func wrapMap(w io.Writer, val reflect.Value) error {
-    ks := val.MapKeys()
-    if len(ks) < 1 {
-        //return fmt.Errorf("Empty Map")
-        fmt.Fprintf(w, "<struct>\n</struct>")
-        return nil
-    }
-    if ks[0].Kind() != reflect.String {
-        return fmt.Errorf("Only support map[string]interface{}, got %v", val)
-    }
-    fmt.Fprintf(w, "<struct>\n")
-    for _, k := range ks {
-        fmt.Fprintf(w, "<member>\n")
-        fmt.Fprintf(w, "<name>%s</name>\n", k)
-        fmt.Fprintf(w, "<value>")
-        ret := wrapValue(w, val.MapIndex(k))
-        if ret != nil { return ret }
-        fmt.Fprintf(w, "</value>\n</member>\n")
-    }
-    fmt.Fprintf(w, "</struct>")
-    return nil
-    //return fmt.Errorf("Not wrapping type %v (%v)", val.Kind().String(), val)
+	ks := val.MapKeys()
+	if len(ks) < 1 {
+		//return fmt.Errorf("Empty Map")
+		fmt.Fprintf(w, "<struct>\n</struct>")
+		return nil
+	}
+	if ks[0].Kind() != reflect.String {
+		return fmt.Errorf("Only support map[string]interface{}, got %v", val)
+	}
+	fmt.Fprintf(w, "<struct>\n")
+	for _, k := range ks {
+		fmt.Fprintf(w, "<member>\n")
+		fmt.Fprintf(w, "<name>%s</name>\n", k)
+		fmt.Fprintf(w, "<value>")
+		ret := wrapValue(w, val.MapIndex(k))
+		if ret != nil {
+			return ret
+		}
+		fmt.Fprintf(w, "</value>\n</member>\n")
+	}
+	fmt.Fprintf(w, "</struct>")
+	return nil
+	//return fmt.Errorf("Not wrapping type %v (%v)", val.Kind().String(), val)
 }
-
 
 // translate an map[string]interface{} into XML
 func wrapStruct(w io.Writer, val reflect.Value) error {
-    fmt.Fprintf(w, "<struct>\n")
-    for i := 0; i < val.NumField(); i++ {
-        f := val.Type().Field(i)
-        fmt.Fprintf(w, "<member>\n")
-        fmt.Fprintf(w, "<name>%s</name>\n", f.Name)
-        fmt.Fprintf(w, "<value>")
-        ret := wrapValue(w, val.Field(i))
-        if ret != nil { return ret }
-        fmt.Fprintf(w, "</value>\n</member>\n")
-    }
-    fmt.Fprintf(w, "</struct>")
-    return nil
+	fmt.Fprintf(w, "<struct>\n")
+	for i := 0; i < val.NumField(); i++ {
+		f := val.Type().Field(i)
+		fmt.Fprintf(w, "<member>\n")
+		fmt.Fprintf(w, "<name>%s</name>\n", f.Name)
+		fmt.Fprintf(w, "<value>")
+		ret := wrapValue(w, val.Field(i))
+		if ret != nil {
+			return ret
+		}
+		fmt.Fprintf(w, "</value>\n</member>\n")
+	}
+	fmt.Fprintf(w, "</struct>")
+	return nil
 }
-
 
 // translate a parameter into XML
 func wrapParam(w io.Writer, i int, xval interface{}) error {
@@ -664,7 +666,7 @@ func wrapValue(w io.Writer, val reflect.Value) error {
 
 	switch val.Kind() {
 	case reflect.Bool:
-		 bval := 0
+		bval := 0
 		if val.Bool() {
 			bval = 1
 		}
@@ -676,14 +678,14 @@ func wrapValue(w io.Writer, val reflect.Value) error {
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
 		fmt.Fprintf(w, "<int>%d</int>", val.Uint())
 	case reflect.String:
-        //fmt.Fprintf(w, "<string>%s</string>", val.String())
-        fmt.Fprintf(w, "<string>")
-        err := xml.EscapeText(w, []byte(val.String()))
-        if err != nil {
-            return fmt.Errorf("Failed to wrapping type %v (%v), err=%s",
-                              val.Kind().String(), val, err.Error())
-        }
-        fmt.Fprintf(w, "</string>")
+		//fmt.Fprintf(w, "<string>%s</string>", val.String())
+		fmt.Fprintf(w, "<string>")
+		err := xml.EscapeText(w, []byte(val.String()))
+		if err != nil {
+			return fmt.Errorf("Failed to wrapping type %v (%v), err=%s",
+				val.Kind().String(), val, err.Error())
+		}
+		fmt.Fprintf(w, "</string>")
 	//case reflect.Uint:
 	//	isError = true
 	//case reflect.Uint8:
@@ -708,7 +710,7 @@ func wrapValue(w io.Writer, val reflect.Value) error {
 		isError = true
 	case reflect.Interface:
 		//isError = true
-        return wrapValue(w, val.Elem())
+		return wrapValue(w, val.Elem())
 	case reflect.Map:
 		//isError = true
 		return wrapMap(w, val)
@@ -723,7 +725,7 @@ func wrapValue(w io.Writer, val reflect.Value) error {
 
 		if !val.Type().ConvertibleTo(timeType) {
 			//isError = true
-            return wrapStruct(w, val)
+			return wrapStruct(w, val)
 		} else {
 			method := val.MethodByName("Format")
 			params := []reflect.Value{reflect.ValueOf(ISO8601_LAYOUT)}
@@ -781,17 +783,16 @@ func marshalArray(w io.Writer, methodName string, args []interface{}) error {
 	return nil
 }
 
-
 // XML-RPC client data
 type Client struct {
 	http.Client
 	urlStr string
 }
 
-
 // connect to a remote XML-RPC server
-//func NewClient(host string, port int) (*Client, error) {
-//    address := fmt.Sprintf("http://%s:%d/RPC2", host, port)
+//
+//	func NewClient(host string, port int) (*Client, error) {
+//	   address := fmt.Sprintf("http://%s:%d/RPC2", host, port)
 func NewClient(address string) (*Client, error) {
 	uurl, uerr := url.Parse(address)
 	if uerr != nil {
@@ -799,7 +800,6 @@ func NewClient(address string) (*Client, error) {
 	}
 	return &Client{urlStr: uurl.String()}, nil
 }
-
 
 // call a procedure on a remote XML-RPC server
 func (c *Client) RPCCall(methodName string,
